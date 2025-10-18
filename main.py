@@ -26,7 +26,7 @@ class MainWindow(CTk):
 
         self.create_ui()
 
-        self.username = "Олександр"
+        self.username = "🌸"
         self.sock = None
         self.connect()
 
@@ -134,3 +134,4 @@ class MainWindow(CTk):
 
 win = MainWindow()
 win.mainloop()
+
