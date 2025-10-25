@@ -3,6 +3,35 @@ from socket import *
 import threading
 
 
+class RegisterWindow(CTk):
+    def __init__(self):
+        super().__init__()
+        self.username = None
+        self.title('Приєднатися до сервера')
+        self.geometry('300x300')
+        CTkLabel(self, text='Вхід в LogiTalk', font=('Arial', 20, 'bold')).pack(pady=40)
+        self.name_entry = CTkEntry(self, placeholder_text='Введіть імʼя')
+        self.name_entry.pack()
+        self.host_entry = CTkEntry(self, placeholder_text='Введіть хост сервера localhost')
+        self.host_entry.pack(pady=5)
+        self.port_entry = CTkEntry(self, placeholder_text='Введіть порт сервера 12334 ')
+        self.port_entry.pack()
+        self.submit_button = CTkButton(self, text='Приєднатися', command=self.start_chat)
+        self.submit_button.pack(pady=5)
+
+    def start_chat(self):
+        self.username = self.name_entry.get().strip()
+        try:
+            self.sock = socket(AF_INET, SOCK_STREAM)
+            self.sock.connect((self.host_entry.get(), int(self.port_entry.get())))
+            hello = f"[SYSTEM] {self.username} приєднався(лась) до чату!\n"
+            self.sock.send(hello.encode('utf-8'))
+            self.destroy()
+            win = MainWindow(self.sock, self.username)
+            win.mainloop()
+        except Exception as e:
+            print(f"Не вдалося підключитися до сервера: {e}")
+
 class SideFrame(CTkFrame):
     def __init__(self, parent: 'MainWindow'):
         super().__init__(parent, width=200, height=parent.winfo_height())
@@ -10,12 +39,17 @@ class SideFrame(CTkFrame):
         self.configure(width=0)
         self.place(x=0, y=0)
 
+        self.entry = CTkEntry(self, placeholder_text="Введіть нікнейм...")
+        self.entry.pack(pady=30)
+        self.btn = CTkButton(self, text="Встановити нікнейм", command=parent.change_nickname)
+        self.btn.pack(pady=10)
+
         self.label_theme = CTkOptionMenu(self, values=['Темна', 'Світла'], command=parent.change_theme)
         self.label_theme.pack(side='bottom', pady=20)
 
 
 class MainWindow(CTk):
-    def __init__(self):
+    def __init__(self, sock, username):
         super().__init__()
         self.geometry('400x300')
         self.title("Назва")
@@ -26,9 +60,9 @@ class MainWindow(CTk):
 
         self.create_ui()
 
-        self.username = "🌸"
-        self.sock = None
-        self.connect()
+        self.username = username
+        self.sock = sock
+        threading.Thread(target=self.recv_message, daemon=True).start()
 
     def create_ui(self):
         self.frame = SideFrame(self)
@@ -36,7 +70,7 @@ class MainWindow(CTk):
         self.btn = CTkButton(self, text='▶', command=self.toggle_show_menu, width=30)
         self.btn.place(x=0, y=0)
 
-        self.chat_text = CTkTextbox(self, state='disable', fg_color="grey")
+        self.chat_text = CTkTextbox(self, state='disable')
         self.chat_text.place(x=0, y=30)
         self.message_input = CTkEntry(self, placeholder_text='Введіть повідомлення:')
         self.message_input.place(x=0, y=250)
@@ -72,13 +106,16 @@ class MainWindow(CTk):
             self.after(20, self.close_menu)
 
     def adaptive_ui(self):
-        self.chat_text.configure(width=self.winfo_width() - self.frame.winfo_width(), height=self.winfo_height() - self.message_input.winfo_height() - 30)
+        self.chat_text.configure(width=self.winfo_width() - self.frame.winfo_width(),
+                                 height=self.winfo_height() - self.message_input.winfo_height() - 30)
         self.chat_text.place(x=self.frame.winfo_width() - 1)
 
-        self.message_input.configure(width=self.winfo_width() - self.frame.winfo_width() - self.send_button.winfo_width())
+        self.message_input.configure(
+            width=self.winfo_width() - self.frame.winfo_width() - self.send_button.winfo_width())
         self.message_input.place(x=self.frame.winfo_width(), y=self.winfo_height() - self.send_button.winfo_height())
 
-        self.send_button.place(x=self.winfo_width() - self.send_button.winfo_width(), y=self.winfo_height() - self.send_button.winfo_height())
+        self.send_button.place(x=self.winfo_width() - self.send_button.winfo_width(),
+                               y=self.winfo_height() - self.send_button.winfo_height())
 
         self.after(20, self.adaptive_ui)
 
@@ -123,7 +160,6 @@ class MainWindow(CTk):
                 self.sock.sendall(packet.encode())
             except Exception as e:
                 self.add_message(f"Не вдалося надіслати повідомлення: {e}")
-        self.message_input.delete(0, END)
 
     def change_theme(self, value):
         if value == "Темна":
@@ -131,7 +167,11 @@ class MainWindow(CTk):
         else:
             set_appearance_mode("light")
 
+    def change_nickname(self):
+        nickname = self.frame.entry.get()
+        if nickname:
+            self.username = nickname
 
-win = MainWindow()
+
+win = RegisterWindow()
 win.mainloop()
-
